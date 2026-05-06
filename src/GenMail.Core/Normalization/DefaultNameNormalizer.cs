@@ -14,14 +14,20 @@ public sealed partial class DefaultNameNormalizer : INameNormalizer
     {
         string original = input;
         string collapsed = WhitespaceRegex().Replace(input.Trim(), " ");
-        string normalized = RemoveAccents(collapsed).Replace('đ', 'd').Replace('Đ', 'D').ToLowerInvariant();
-        string[] tokens = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        string normalizedText = RemoveAccents(collapsed).Replace('đ', 'd').Replace('Đ', 'D').ToLowerInvariant();
 
-        string first = tokens.Length > 0 ? tokens[0] : string.Empty;
-        string last = tokens.Length > 1 ? tokens[^1] : first;
-        string middle = tokens.Length > 2 ? string.Concat(tokens.Skip(1).Take(tokens.Length - 2)) : string.Empty;
+        List<string> tokens = normalizedText
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(static token => token.Trim())
+            .Where(static token => token.Length > 0)
+            .ToList();
+
+        string first = tokens.Count > 0 ? tokens[0] : string.Empty;
+        string last = tokens.Count > 1 ? tokens[^1] : first;
+        string middle = tokens.Count > 2 ? string.Concat(tokens.Skip(1).Take(tokens.Count - 2)) : string.Empty;
         string all = string.Concat(tokens);
-        string reverseAll = string.Concat(tokens.Reverse());
+        string reverseAll = string.Concat(tokens.AsEnumerable().Reverse());
+        string normalized = string.Join(' ', tokens);
 
         return new NormalizedName(original, normalized, first, middle, last, all, reverseAll, false);
     }

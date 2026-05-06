@@ -40,10 +40,10 @@ public sealed class NumberExpansionService
 
         if (mode is NumberPlacementMode.InfixBeforeLastToken or NumberPlacementMode.All)
         {
-            int idx = baseUsername.LastIndexOf('.', StringComparison.Ordinal);
-            if (idx > 0)
+            int separatorIndex = baseUsername.LastIndexOfAny(['.', '_', '-']);
+            if (separatorIndex > 0)
             {
-                yield return baseUsername[..idx] + number + baseUsername[idx..];
+                yield return baseUsername[..separatorIndex] + number + baseUsername[separatorIndex..];
             }
             else
             {
