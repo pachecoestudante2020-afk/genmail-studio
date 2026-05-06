@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows.Input;
 using GenMail.Core.Generation;
 using GenMail.Core.Models;
@@ -6,7 +7,6 @@ using GenMail.Core.Pipeline;
 using GenMail.Core.Safety;
 using GenMail.Wpf.Commands;
 using GenMail.Wpf.Services;
-using System.IO;
 
 namespace GenMail.Wpf.ViewModels;
 

@@ -145,7 +145,6 @@ public sealed class CoreFeatureTests
         Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "emails.txt")));
     }
 
-
     [Fact]
     public async Task Pipeline_SplitOutputFiles_WritesExpectedChunks()
     {
