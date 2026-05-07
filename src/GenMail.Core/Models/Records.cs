@@ -23,7 +23,7 @@ public sealed record ProcessingCounters(
     long QualityRejected,
     long DuplicateSkipped,
     long EmailsWritten,
-    long OutputFilesCreated,
+    int OutputFilesCreated,
     int? RowsPerOutputFile);
 
 public sealed record ProcessingResult(
