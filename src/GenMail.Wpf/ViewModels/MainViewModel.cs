@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows.Input;
 using GenMail.Core.Generation;
 using GenMail.Core.Models;
@@ -6,7 +7,6 @@ using GenMail.Core.Pipeline;
 using GenMail.Core.Safety;
 using GenMail.Wpf.Commands;
 using GenMail.Wpf.Services;
-using System.IO;
 
 namespace GenMail.Wpf.ViewModels;
 
@@ -25,6 +25,8 @@ public sealed class MainViewModel : ObservableObject
     private AliasFilterMode _aliasFilterMode = AliasFilterMode.None;
     private long _maxOutputEmails = 1_000_000;
     private long _maxNumbersPerBase = 1_000;
+    private bool _splitOutputFiles;
+    private int? _rowsPerOutputFile = 50000;
     private string _statusText = "Ready";
     private string _outputFolder = string.Empty;
     private long _inputLinesRead;
@@ -60,6 +62,8 @@ public sealed class MainViewModel : ObservableObject
     public AliasFilterMode AliasFilterMode { get => _aliasFilterMode; set => SetProperty(ref _aliasFilterMode, value); }
     public long MaxOutputEmails { get => _maxOutputEmails; set => SetProperty(ref _maxOutputEmails, value); }
     public long MaxNumbersPerBase { get => _maxNumbersPerBase; set => SetProperty(ref _maxNumbersPerBase, value); }
+    public bool SplitOutputFiles { get => _splitOutputFiles; set => SetProperty(ref _splitOutputFiles, value); }
+    public int? RowsPerOutputFile { get => _rowsPerOutputFile; set => SetProperty(ref _rowsPerOutputFile, value); }
     public string StatusText { get => _statusText; set => SetProperty(ref _statusText, value); }
     public string OutputFolder { get => _outputFolder; set { if (SetProperty(ref _outputFolder, value)) RaiseCommandStates(); } }
     public long InputLinesRead { get => _inputLinesRead; set => SetProperty(ref _inputLinesRead, value); }
@@ -105,7 +109,13 @@ public sealed class MainViewModel : ObservableObject
             GenerationOptions options = BuildOptions();
             OutputEstimator estimator = new(new GenMail.Core.Numbering.NumberRangeParser());
             SafetyEstimate estimate = estimator.Estimate(inputCount, options);
-            StatusText = $"Estimated outputs: {estimate.EstimatedOutputs:n0} (lines: {inputCount:n0}, per-base numbers: {estimate.EstimatedNumbersPerBase:n0})";
+            string fileEstimate = string.Empty;
+            if (SplitOutputFiles && RowsPerOutputFile.HasValue && RowsPerOutputFile.Value > 0)
+            {
+                long estimatedFiles = (long)Math.Ceiling((double)estimate.EstimatedOutputs / RowsPerOutputFile.Value);
+                fileEstimate = $", estimated files: {estimatedFiles:n0}";
+            }
+            StatusText = $"Estimated outputs: {estimate.EstimatedOutputs:n0} (lines: {inputCount:n0}, per-base numbers: {estimate.EstimatedNumbersPerBase:n0}{fileEstimate})";
         }
         catch (Exception ex)
         {
@@ -171,7 +181,9 @@ public sealed class MainViewModel : ObservableObject
         AllowAllDigitUsernames: false,
         MinUsernameLength: 3,
         MaxUsernameLength: 32,
-        OutputRootPath: "output");
+        OutputRootPath: "output",
+        SplitOutputFiles: SplitOutputFiles,
+        RowsPerOutputFile: SplitOutputFiles ? RowsPerOutputFile : null);
 
     private void ResetCounters()
     {

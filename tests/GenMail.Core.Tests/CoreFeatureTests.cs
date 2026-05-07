@@ -143,5 +143,61 @@ public sealed class CoreFeatureTests
         GenMailPipeline pipeline = new();
         ProcessingResult result = await pipeline.RunAsync(inputPath, options, progress: null, CancellationToken.None);
         Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "emails.txt")));
+        Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "usernames.txt")));
     }
+
+    [Fact]
+    public async Task Pipeline_SplitOutputFiles_WritesExpectedChunks()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), $"gm-split-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        string inputPath = Path.Combine(tempDir, "input.txt");
+        await File.WriteAllLinesAsync(inputPath, new[] { "John Smith", "Jane Smith", "Bob Smith", "Amy Smith", "Tom Smith" });
+
+        GenerationOptions options = GenerationOptions.Default with
+        {
+            Domain = "example.com",
+            RuleIds = new[] { "first" },
+            NumberMode = NumberMode.BaseOnly,
+            SplitOutputFiles = true,
+            RowsPerOutputFile = 2,
+            OutputRootPath = tempDir
+        };
+
+        GenMailPipeline pipeline = new();
+        ProcessingResult result = await pipeline.RunAsync(inputPath, options, progress: null, CancellationToken.None);
+
+        string e1 = Path.Combine(result.OutputDirectory, "emails_001.txt");
+        string e2 = Path.Combine(result.OutputDirectory, "emails_002.txt");
+        string e3 = Path.Combine(result.OutputDirectory, "emails_003.txt");
+        string e4 = Path.Combine(result.OutputDirectory, "emails_004.txt");
+        Assert.True(File.Exists(e1));
+        Assert.True(File.Exists(e2));
+        Assert.True(File.Exists(e3));
+        Assert.False(File.Exists(e4));
+
+        Assert.Equal(2, File.ReadAllLines(e1).Length);
+        Assert.Equal(2, File.ReadAllLines(e2).Length);
+        Assert.Equal(1, File.ReadAllLines(e3).Length);
+
+        string u1 = Path.Combine(result.OutputDirectory, "usernames_001.txt");
+        string u2 = Path.Combine(result.OutputDirectory, "usernames_002.txt");
+        string u3 = Path.Combine(result.OutputDirectory, "usernames_003.txt");
+        Assert.Equal(File.ReadAllLines(u1).Length, File.ReadAllLines(e1).Length);
+        Assert.Equal(File.ReadAllLines(u2).Length, File.ReadAllLines(e2).Length);
+        Assert.Equal(File.ReadAllLines(u3).Length, File.ReadAllLines(e3).Length);
+    }
+
+    [Fact]
+    public void SafetyGuard_RejectsInvalidSplitSettings()
+    {
+        SafetyGuard guard = new();
+        GenerationOptions missingRows = GenerationOptions.Default with { SplitOutputFiles = true, RowsPerOutputFile = null };
+        GenerationOptions zeroRows = GenerationOptions.Default with { SplitOutputFiles = true, RowsPerOutputFile = 0 };
+        GenerationOptions tooLargeRows = GenerationOptions.Default with { SplitOutputFiles = true, RowsPerOutputFile = 10_000_001 };
+        Assert.Throws<InvalidOperationException>(() => guard.ValidateOptions(missingRows));
+        Assert.Throws<InvalidOperationException>(() => guard.ValidateOptions(zeroRows));
+        Assert.Throws<InvalidOperationException>(() => guard.ValidateOptions(tooLargeRows));
+    }
+
 }

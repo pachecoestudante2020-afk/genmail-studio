@@ -12,7 +12,9 @@ public sealed record GenerationOptions(
     bool AllowAllDigitUsernames,
     int MinUsernameLength,
     int MaxUsernameLength,
-    string OutputRootPath)
+    string OutputRootPath,
+    bool SplitOutputFiles,
+    int? RowsPerOutputFile)
 {
     public static GenerationOptions Default => new(
         Domain: "example.com",
@@ -26,5 +28,7 @@ public sealed record GenerationOptions(
         AllowAllDigitUsernames: false,
         MinUsernameLength: 3,
         MaxUsernameLength: 32,
-        OutputRootPath: "output");
+        OutputRootPath: "output",
+        SplitOutputFiles: false,
+        RowsPerOutputFile: null);
 }

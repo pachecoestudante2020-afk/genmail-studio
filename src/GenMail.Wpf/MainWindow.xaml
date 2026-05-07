@@ -95,6 +95,9 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -102,7 +105,11 @@
                     <TextBlock Grid.Row="0" Text="Max Output Emails" />
                     <TextBox Grid.Row="0" Margin="0,20,0,8" Text="{Binding MaxOutputEmails, UpdateSourceTrigger=PropertyChanged}" />
                     <TextBlock Grid.Row="1" Text="Max Numbers Per Base" />
-                    <TextBox Grid.Row="1" Margin="0,20,0,0" Text="{Binding MaxNumbersPerBase, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBox Grid.Row="1" Margin="0,20,0,8" Text="{Binding MaxNumbersPerBase, UpdateSourceTrigger=PropertyChanged}" />
+                    <CheckBox Grid.Row="2" Content="Split output into multiple files" IsChecked="{Binding SplitOutputFiles}" Margin="0,4,0,8" />
+                    <TextBlock Grid.Row="3" Text="Rows per output file" />
+                    <TextBox Grid.Row="3" Margin="0,20,0,8" Text="{Binding RowsPerOutputFile, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding SplitOutputFiles}" />
+                    <TextBlock Grid.Row="4" TextWrapping="Wrap" FontSize="11" Text="The app will not generate extra data to fill files. The last file may contain fewer rows." />
                 </Grid>
             </GroupBox>
         </Grid>

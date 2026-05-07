@@ -22,7 +22,9 @@ public sealed record ProcessingCounters(
     long UsernamesGenerated,
     long QualityRejected,
     long DuplicateSkipped,
-    long EmailsWritten);
+    long EmailsWritten,
+    int OutputFilesCreated,
+    int? RowsPerOutputFile);
 
 public sealed record ProcessingResult(
     string OutputDirectory,

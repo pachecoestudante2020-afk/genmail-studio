@@ -31,6 +31,7 @@ public sealed class GenMailPipeline
         if (!File.Exists(inputPath)) throw new FileNotFoundException("Input file was not found.", inputPath);
         if (!string.Equals(Path.GetExtension(inputPath), ".txt", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Input file must be .txt.", nameof(inputPath));
         _emailBuilder.ValidateDomain(options.Domain);
+        _safetyGuard.ValidateOptions(options);
 
         string outputDir = Path.Combine(options.OutputRootPath, DateTime.UtcNow.ToString("yyyyMMdd_HHmmss"));
         Directory.CreateDirectory(outputDir);
@@ -50,8 +51,6 @@ public sealed class GenMailPipeline
         SafetyEstimate estimate = new OutputEstimator(_numberParser).Estimate(inputLines, options);
         _safetyGuard.EnsureSafe(estimate);
 
-        string usernamesPath = Path.Combine(outputDir, "usernames.txt");
-        string emailsPath = Path.Combine(outputDir, "emails.txt");
         List<IReadOnlyList<string>> duplicateRows = new();
         List<IReadOnlyList<string>> qualityRows = new();
         List<IReadOnlyList<string>> rejectedInputRows = new();
@@ -62,8 +61,7 @@ public sealed class GenMailPipeline
         long duplicateSkipped = 0;
         long rejectedInputs = 0;
 
-        await using StreamWriter userWriter = new(usernamesPath, false);
-        await using StreamWriter emailWriter = new(emailsPath, false);
+        await using OutputFileSetWriter writer = new(outputDir, options.SplitOutputFiles, options.RowsPerOutputFile);
 
         await foreach (InputRecord record in _lineReader.ReadAsync(inputPath, options.SkipEmptyLines, cancellationToken))
         {
@@ -71,15 +69,9 @@ public sealed class GenMailPipeline
             linesProcessed++;
             string input = record.TrimmedText;
 
-            NormalizedName normalized;
-            if (_directDetector.IsDirectUsername(input))
-            {
-                normalized = new NormalizedName(input, input.ToLowerInvariant(), input.ToLowerInvariant(), string.Empty, input.ToLowerInvariant(), input.ToLowerInvariant(), input.ToLowerInvariant(), true);
-            }
-            else
-            {
-                normalized = _normalizer.Normalize(input);
-            }
+            NormalizedName normalized = _directDetector.IsDirectUsername(input)
+                ? new NormalizedName(input, input.ToLowerInvariant(), input.ToLowerInvariant(), string.Empty, input.ToLowerInvariant(), input.ToLowerInvariant(), input.ToLowerInvariant(), true)
+                : _normalizer.Normalize(input);
 
             if (normalized.All.Length == 0)
             {
@@ -111,8 +103,7 @@ public sealed class GenMailPipeline
                     }
 
                     string email = _emailBuilder.Build(username, options.Domain);
-                    await userWriter.WriteLineAsync(username).ConfigureAwait(false);
-                    await emailWriter.WriteLineAsync(email).ConfigureAwait(false);
+                    await writer.WriteAsync(username, email).ConfigureAwait(false);
                     usernamesAccepted++;
                 }
             }
@@ -123,17 +114,20 @@ public sealed class GenMailPipeline
             }
         }
 
-        ProcessingCounters counters = new(linesProcessed, rejectedInputs, usernamesAccepted, qualityRejected, duplicateSkipped, usernamesAccepted);
-        ProcessingResult result = new(
-            outputDir,
-            counters,
-            estimate,
-            new[] { usernamesPath, emailsPath, Path.Combine(outputDir, "duplicate_skipped.csv"), Path.Combine(outputDir, "quality_rejected.csv"), Path.Combine(outputDir, "rejected_inputs.csv"), Path.Combine(outputDir, "summary.txt") });
+        ProcessingCounters counters = new(linesProcessed, rejectedInputs, usernamesAccepted, qualityRejected, duplicateSkipped, usernamesAccepted, writer.FilesCreated.Count, options.RowsPerOutputFile);
+        List<string> generatedFiles = new(writer.FilesCreated)
+        {
+            Path.Combine(outputDir, "duplicate_skipped.csv"),
+            Path.Combine(outputDir, "quality_rejected.csv"),
+            Path.Combine(outputDir, "rejected_inputs.csv"),
+            Path.Combine(outputDir, "summary.txt")
+        };
+        ProcessingResult result = new(outputDir, counters, estimate, generatedFiles);
 
         await _csvReportWriter.WriteRowsAsync(Path.Combine(outputDir, "duplicate_skipped.csv"), new[] { "line", "username" }, duplicateRows, cancellationToken).ConfigureAwait(false);
         await _csvReportWriter.WriteRowsAsync(Path.Combine(outputDir, "quality_rejected.csv"), new[] { "line", "username", "reason" }, qualityRows, cancellationToken).ConfigureAwait(false);
         await _csvReportWriter.WriteRowsAsync(Path.Combine(outputDir, "rejected_inputs.csv"), new[] { "line", "input", "reason" }, rejectedInputRows, cancellationToken).ConfigureAwait(false);
-        await _summaryWriter.WriteAsync(Path.Combine(outputDir, "summary.txt"), result, cancellationToken).ConfigureAwait(false);
+        await _summaryWriter.WriteAsync(Path.Combine(outputDir, "summary.txt"), result, options, cancellationToken).ConfigureAwait(false);
 
         progress?.Report(new ProgressSnapshot(linesProcessed, usernamesAccepted, usernamesAccepted, "completed", DateTimeOffset.UtcNow));
         return result;
